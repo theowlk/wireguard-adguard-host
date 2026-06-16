@@ -1,0 +1,44 @@
+name: wireguard-adguard
+
+services:
+  wireguard:
+    image: ghcr.io/wg-easy/wg-easy:15
+    container_name: wg-easy
+    network_mode: host
+    restart: unless-stopped
+
+    environment:
+      INSECURE: "true"
+      DISABLE_IPV6: "true"
+      PORT: "${WG_UI_PORT:-51821}"
+
+      # Applied only on the first initialization.
+      INIT_ENABLED: "true"
+      INIT_USERNAME: "${WG_USERNAME}"
+      INIT_PASSWORD: "${WG_PASSWORD}"
+      INIT_HOST: "${WG_HOST}"
+      INIT_PORT: "${WG_PORT:-51820}"
+      INIT_DNS: "${WG_DNS:-10.8.0.1}"
+
+    volumes:
+      - ./data/wireguard:/etc/wireguard
+      - /lib/modules:/lib/modules:ro
+
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+
+    devices:
+      - /dev/net/tun:/dev/net/tun
+
+  adguard:
+    image: adguard/adguardhome:latest
+    container_name: adguard-home
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - wireguard
+
+    volumes:
+      - ./data/adguard/work:/opt/adguardhome/work
+      - ./data/adguard/conf:/opt/adguardhome/conf
