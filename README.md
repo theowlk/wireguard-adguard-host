@@ -6,51 +6,76 @@ A deliberately small Docker Compose setup for:
 - [AdGuard Home](https://github.com/AdguardTeam/AdGuardHome): DNS-level ad and tracker blocking
 - Linux host networking: no custom Docker networks and no reverse proxy
 
+## What the installer does
+
+A single run of `install.sh`:
+
+- installs Docker Engine when it is missing;
+- creates `.env` when it does not exist;
+- detects the public IPv4 address, with a local IPv4 fallback;
+- generates a strong random wg-easy administrator password;
+- preserves existing `.env` values on later runs;
+- enables IPv4 forwarding;
+- pulls and starts wg-easy and AdGuard Home;
+- prints the URLs, endpoint and generated credentials.
+
+The generated `.env` file is private (`chmod 600`) and ignored by Git.
+
 ## Requirements
 
 - A Linux server
 - Root or `sudo` access
-- `git` and `curl`
-- A public IP address or DNS name
+- `git`
 
-Docker Engine is installed automatically by `install.sh` when it is missing.
+The installer can install `curl`, `openssl` and Docker on common distributions using `apt`, `dnf`, `yum` or `apk`.
 
 ## Install
 
 ```bash
 git clone https://github.com/theowlk/wireguard-adguard-host.git
 cd wireguard-adguard-host
-sudo ./install.sh
+sudo bash install.sh
 ```
 
-The first run creates `.env` and stops. Edit it:
+That is all. No manual `.env` editing is required for a normal installation.
+
+At the end, the installer prints something similar to:
+
+```text
+wg-easy UI:        http://192.168.1.10:51821
+AdGuard setup:     http://192.168.1.10:3000
+WireGuard endpoint: 203.0.113.10:51820/udp
+Username:           admin
+Password:           generated-random-password
+```
+
+The same values are stored in `.env`:
 
 ```bash
-nano .env
+sudo cat .env
 ```
 
-Set at least:
+## Existing configuration
+
+The installer is idempotent. Running it again updates the containers but does not replace a configured host, username or password.
+
+To use a DNS name instead of the detected public IPv4, edit `.env` before running the installer again:
 
 ```dotenv
 WG_HOST=vpn.example.com
-WG_PASSWORD=replace-with-a-strong-password
-```
-
-Then start the stack:
-
-```bash
-sudo ./install.sh
 ```
 
 ## Finish the setup
 
-1. Open AdGuard Home at `http://SERVER_IP:3000`.
-2. Complete its setup wizard. Keep DNS on port `53`.
-3. Open wg-easy at `http://SERVER_IP:51821`.
-4. Sign in with the credentials from `.env` and create a client.
-5. Forward UDP port `51820` from your router to the server.
+1. Open AdGuard Home at the URL printed by the installer.
+2. Complete its setup wizard and keep DNS on port `53`.
+3. Open the wg-easy URL printed by the installer.
+4. Sign in with the generated credentials and create a client.
+5. Forward UDP port `51820` from the router to the server's local IPv4 address.
 
 WireGuard clients use `10.8.0.1` as their DNS server, so DNS requests go through AdGuard Home.
+
+If the connection uses CGNAT, forwarding a public port may not be possible even when a public IPv4 is detected externally. Use a VPS or request a real public IPv4 from the ISP.
 
 ## Security
 
@@ -67,14 +92,14 @@ On a directly exposed VPS, restrict these ports with the provider firewall or th
 ## Useful commands
 
 ```bash
+# Run the installer again and update the containers
+sudo bash install.sh
+
 # Show status
 docker compose ps
 
 # Show logs
 docker compose logs -f
-
-# Update containers
-docker compose pull && docker compose up -d
 
 # Stop the stack
 docker compose down
